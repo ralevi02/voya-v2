@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: File length check
+        run: |
+          FAILED=0
+          while IFS= read -r -d '' file; do
+            lines=$(wc -l < "$file")
+            if [ "$lines" -gt 150 ]; then
+              echo "❌ $file has $lines lines (max 150)"
+              FAILED=1
+            fi
+          done < <(find app components hooks services store types -name "*.ts" -o -name "*.tsx" -print0 2>/dev/null)
+          if [ "$FAILED" -eq 1 ]; then exit 1; fi
+          echo "✅ All files within 150 lines"
+
+      - name: Unit tests
+        run: npm test
